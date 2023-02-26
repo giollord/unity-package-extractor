@@ -2,7 +2,8 @@
 Extractor for Unity packages (files with extension *.unitypackage) on .Net 7.0. Have option to extract *.meta files and preview images if they are present.
 
 ## Requirements on Windows:
-- .Net 7.0 Runtime (can be downloaded [on Microsoft website](https://dotnet.microsoft.com/en-us/download/dotnet/7.0))
+- .Net 7.0 Runtime (can be downloaded [on Microsoft website](https://dotnet.microsoft.com/en-us/download/dotnet/7.0)).<br/>
+  If you don't have it and don't want to install .Net 7.0, then just use `win-x86-full.zip` or `win-x64-full.zip` from [latest release](https://github.com/giollord/unity-package-extractor/releases/latest)
 
 ## Usage on Windows:
 1. Download [latest release](https://github.com/giollord/unity-package-extractor/releases/latest) for x86 or x64 and unpack .exe file.
