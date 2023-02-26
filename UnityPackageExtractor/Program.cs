@@ -1,6 +1,6 @@
 ﻿using CommandLine;
-using SharpCompress.Archives.Tar;
-using SharpCompress.Readers;
+using System.Formats.Tar;
+using System.IO.Compression;
 
 var parsedArgs = Parser.Default.ParseArguments<CommandLineOptions>(args)?.Value;
 if (parsedArgs == null)
@@ -25,70 +25,64 @@ var packageCounter = 0;
 foreach(var unityPackageFile in allAssetFiles)
 {
     Console.WriteLine($"Processing {++packageCounter}/{allAssetFiles.Count} '{Path.GetFileName(unityPackageFile)}' at '{Path.GetDirectoryName(unityPackageFile)}'...");
-    using (var archive = TarArchive.Open(unityPackageFile))
+    var currentDestinationPath = copyToDirectoryNearAsset ? Path.GetDirectoryName(unityPackageFile)! : destinationPath;
+    var resultFilePaths = new Dictionary<string, string>();
+
+    // First pass in unitypackage - collecting file names
+    Console.Write($"Discovering contents of unity package...");
+    using (var fileStream = File.OpenRead(unityPackageFile))
+    using (var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress))
+    using (var tarReader = new TarReader(gzipStream))
     {
-        var currentDestinationPath = copyToDirectoryNearAsset ? Path.GetDirectoryName(unityPackageFile)! : destinationPath;
-        var resultFilePaths = new Dictionary<string, string>();
-
-        // First pass in unitypackage - collecting file names
-        Console.Write($"Discovering contents of unity package...");
-        using (var reader = archive.ExtractAllEntries())
+        TarEntry? entry;
+        while ((entry = tarReader.GetNextEntry()) != null)
         {
-            while (reader.MoveToNextEntry())
-            {
-                var entry = reader.Entry;
-                if (entry.IsDirectory || !entry.Key.EndsWith("pathname"))
-                    continue;
+            if (entry.EntryType == TarEntryType.Directory || !entry.Name.EndsWith("pathname") || entry.DataStream == null)
+                continue;
 
-                using var memoryStream = new MemoryStream();
-                reader.WriteEntryTo(memoryStream);
-                memoryStream.Flush();
-                memoryStream.Seek(0, SeekOrigin.Begin);
+            using var streamReader = new StreamReader(entry.DataStream, leaveOpen: true);
+            var filePath = streamReader.ReadToEnd();
+            filePath = filePath.Substring(0, filePath.IndexOf('\n'));
 
-                using var streamReader = new StreamReader(memoryStream);
-                var filePath = streamReader.ReadToEnd();
-                filePath = filePath.Substring(0, filePath.IndexOf('\n'));
-
-                // getting key of asset - it it's top folder name
-                var key = entry.Key.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0];
-                resultFilePaths[key] = filePath;
-            }
-            reader.Cancel();
+            // getting key of asset - it it's top folder name
+            var key = entry.Name.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0];
+            resultFilePaths[key] = filePath;
         }
+    }
 
-        // Second pass in unitypackage - unpacking 
-        Console.Write($"Found {resultFilePaths.Count} files within asset. Extracting...");
-        using (var reader = archive.ExtractAllEntries())
+    // Second pass in unitypackage - unpacking 
+    Console.Write($"Found {resultFilePaths.Count} files within asset. Extracting...");
+    using (var fileStream = File.OpenRead(unityPackageFile))
+    using (var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress))
+    using (var tarReader = new TarReader(gzipStream))
+    {
+        TarEntry? entry;
+        while ((entry = tarReader.GetNextEntry()) != null)
         {
-            while (reader.MoveToNextEntry())
+            if (entry.EntryType == TarEntryType.Directory)
+                continue;
+
+            // detecting type of asset - is it asset, meta file or preview image
+            var type = entry.Name.Split(new char[] { '\\', '/' }).Last();
+            if (type != "asset" && (!generateMeta || type != "asset.meta") && (!generatePreview || !type.StartsWith("preview")))
+                continue;
+
+            // getting key of asset - it it's top folder name
+            var key = entry.Name.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0];
+            var destFilePath = Path.Combine(currentDestinationPath, resultFilePaths[key]);
+            if (destFilePath == null)
             {
-                var entry = reader.Entry;
-                if (entry.IsDirectory)
-                    continue;
-
-                // detecting type of asset - is it asset, meta file or preview image
-                var type = entry.Key.Split(new char[] { '\\', '/' }).Last();
-                if (type != "asset" && (!generateMeta || type != "asset.meta") && (!generatePreview || !type.StartsWith("preview")))
-                    continue;
-
-                // getting key of asset - it it's top folder name
-                var key = entry.Key.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0];
-                var destFilePath = Path.Combine(currentDestinationPath, resultFilePaths[key]);
-                if (destFilePath == null)
-                {
-                    Console.WriteLine($"Incorrect asset name, skipping: {resultFilePaths[key]}");
-                }
-
-                if (generatePreview && type.StartsWith("preview"))
-                    destFilePath = Path.Combine(currentDestinationPath, "__Preview", resultFilePaths[key] + Path.GetExtension(type));
-                else if (generateMeta && type == "asset.meta")
-                    destFilePath += ".meta";
-
-                var destDirectory = Path.GetDirectoryName(destFilePath);
-                Directory.CreateDirectory(destDirectory!);
-                reader.WriteEntryTo(destFilePath!);
+                Console.WriteLine($"Incorrect asset name, skipping: {resultFilePaths[key]}");
             }
-            reader.Cancel();
+
+            if (generatePreview && type.StartsWith("preview"))
+                destFilePath = Path.Combine(currentDestinationPath, "__Preview", resultFilePaths[key] + Path.GetExtension(type));
+            else if (generateMeta && type == "asset.meta")
+                destFilePath += ".meta";
+
+            var destDirectory = Path.GetDirectoryName(destFilePath);
+            Directory.CreateDirectory(destDirectory!);
+            entry.ExtractToFile(destFilePath!, true);
         }
         Console.WriteLine(" DONE");
     }

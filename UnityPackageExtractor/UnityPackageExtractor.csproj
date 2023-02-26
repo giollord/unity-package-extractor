@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
-    <PackageReference Include="SharpCompress" Version="0.32.2" />
   </ItemGroup>
 
 </Project>
