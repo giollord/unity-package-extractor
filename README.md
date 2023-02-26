@@ -1,5 +1,5 @@
 # unity-package-extractor
-Extractor for Unity packages on .Net 7.0. Have option to extract *.meta files and preview images if they are present.
+Extractor for Unity packages (files with extension *.unitypackage) on .Net 7.0. Have option to extract *.meta files and preview images if they are present.
 
 ## Requirements on Windows:
 - .Net 7.0 Runtime (can be downloaded [on Microsoft website](https://dotnet.microsoft.com/en-us/download/dotnet/7.0))
