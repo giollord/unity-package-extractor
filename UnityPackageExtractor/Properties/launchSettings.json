@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "UnityPackageExtractor": {
+      "commandName": "Project",
+      "commandLineArgs": "-m -p"
+    }
+  }
+}
