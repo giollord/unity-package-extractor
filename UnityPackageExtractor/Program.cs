@@ -22,12 +22,12 @@ var allAssetFiles = Directory.EnumerateFiles(sourcePath, "*.unitypackage", Searc
 Console.WriteLine($"Found {allAssetFiles.Count} *.unitypackage files.");
 var packageCounter = 0;
 
-foreach(var asset in allAssetFiles)
+foreach(var unityPackageFile in allAssetFiles)
 {
-    Console.WriteLine($"Processing {++packageCounter}/{allAssetFiles.Count} '{Path.GetFileName(asset)}' at '{Path.GetDirectoryName(asset)}'...");
-    using (var archive = TarArchive.Open(asset))
+    Console.WriteLine($"Processing {++packageCounter}/{allAssetFiles.Count} '{Path.GetFileName(unityPackageFile)}' at '{Path.GetDirectoryName(unityPackageFile)}'...");
+    using (var archive = TarArchive.Open(unityPackageFile))
     {
-        var currentDestinationPath = copyToDirectoryNearAsset ? Path.GetDirectoryName(asset) : destinationPath;
+        var currentDestinationPath = copyToDirectoryNearAsset ? Path.GetDirectoryName(unityPackageFile)! : destinationPath;
         var resultFilePaths = new Dictionary<string, string>();
 
         // First pass in unitypackage - collecting file names
@@ -74,13 +74,19 @@ foreach(var asset in allAssetFiles)
                 // getting key of asset - it it's top folder name
                 var key = entry.Key.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0];
                 var destFilePath = Path.Combine(currentDestinationPath, resultFilePaths[key]);
+                if (destFilePath == null)
+                {
+                    Console.WriteLine($"Incorrect asset name, skipping: {resultFilePaths[key]}");
+                }
 
                 if (generatePreview && type.StartsWith("preview"))
                     destFilePath = Path.Combine(currentDestinationPath, "__Preview", resultFilePaths[key] + Path.GetExtension(type));
                 else if (generateMeta && type == "asset.meta")
                     destFilePath += ".meta";
-                Directory.CreateDirectory(Path.GetDirectoryName(destFilePath));
-                reader.WriteEntryTo(destFilePath);
+
+                var destDirectory = Path.GetDirectoryName(destFilePath);
+                Directory.CreateDirectory(destDirectory!);
+                reader.WriteEntryTo(destFilePath!);
             }
             reader.Cancel();
         }
@@ -94,9 +100,9 @@ Console.WriteLine("Finished!");
 class CommandLineOptions
 {
     [Option('s', "source", HelpText = "Directory to search for unity packages")]
-    public string SourcePath { get; set; }
+    public string? SourcePath { get; set; }
     [Option('d', "destination", HelpText = "Directory where files will be put. Ignored if --inPlace parameter is set")]
-    public string DestinationPath { get; set; }
+    public string? DestinationPath { get; set; }
     [Option('m', "meta", HelpText = "Generate *.meta files")]
     public bool GenerateMeta { get; set; }
     [Option('i', "inPlace", HelpText = "Extract files to directory nearby unity package, instead of using --destination")]
