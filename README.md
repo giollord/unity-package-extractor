@@ -2,10 +2,10 @@
 Extractor for Unity packages on .Net 7.0. Have option to extract *.meta files and preview images if they are present.
 
 ## Requirements on Windows:
-- .Net 7.0 Runtime (can be downloaded at https://dotnet.microsoft.com/en-us/download/dotnet/7.0)
+- .Net 7.0 Runtime (can be downloaded [on Microsoft website](https://dotnet.microsoft.com/en-us/download/dotnet/7.0))
 
 ## Usage on Windows:
-1. Download release for x86 or x64 and unpack .exe file.
+1. Download [latest release](https://github.com/giollord/unity-package-extractor/releases/latest) for x86 or x64 and unpack .exe file.
 2. Place your *.unitypackage files (they can be inside other folders as well) near executable. If you want to copy Unity packages which you downloaded through Unity Editor, you can find them in `%AppData%\Unity\Asset Store-5.x\`, or just run application with `-s "%AppData%\Unity\Asset Store-5.x"` parameter.
 3. Run `UnityPackageExtractor.exe` and wait for it to finish. Optionally, you can add parameters, like `UnityPackageExtractor.exe -m -p -s "%AppData%\Unity\Asset Store-5.x"`:
     - `--help` prints help menu, `UnityPackageExtractor.exe --help`
