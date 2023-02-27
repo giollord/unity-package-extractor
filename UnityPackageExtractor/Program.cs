@@ -1,6 +1,7 @@
 ﻿using CommandLine;
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Text.RegularExpressions;
 
 var parsedArgs = Parser.Default.ParseArguments<CommandLineOptions>(args)?.Value;
 if (parsedArgs == null)
@@ -22,7 +23,12 @@ var allAssetFiles = Directory.EnumerateFiles(sourcePath, "*.unitypackage", Searc
 Console.WriteLine($"Found {allAssetFiles.Count} *.unitypackage files.");
 var packageCounter = 0;
 
-foreach(var unityPackageFile in allAssetFiles)
+// Function to get id of asset
+string? GetKey(string entryName) =>
+    entryName.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)
+        .FirstOrDefault(s => Regex.IsMatch(s, @"[0-9a-f]{32}", RegexOptions.IgnoreCase));
+
+foreach (var unityPackageFile in allAssetFiles)
 {
     Console.WriteLine($"Processing {++packageCounter}/{allAssetFiles.Count} '{Path.GetFileName(unityPackageFile)}' at '{Path.GetDirectoryName(unityPackageFile)}'...");
     var currentDestinationPath = copyToDirectoryNearAsset ? Path.GetDirectoryName(unityPackageFile)! : destinationPath;
@@ -41,11 +47,16 @@ foreach(var unityPackageFile in allAssetFiles)
                 continue;
 
             using var streamReader = new StreamReader(entry.DataStream, leaveOpen: true);
-            var filePath = streamReader.ReadToEnd();
-            filePath = filePath.Substring(0, filePath.IndexOf('\n'));
+            var filePathCandidate = streamReader.ReadToEnd();
+            var indexOfNewLine = filePathCandidate.IndexOf('\n');
+            var filePath = indexOfNewLine > 0 ? filePathCandidate.Substring(0, indexOfNewLine) : filePathCandidate;
 
-            // getting key of asset - it it's top folder name
-            var key = entry.Name.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0];
+            var key = GetKey(entry.Name);
+            if (key == null)
+            {
+                Console.WriteLine($"Can't extract key from asset file '{entry.Name}'");
+                continue;
+            }
             resultFilePaths[key] = filePath;
         }
     }
@@ -67,8 +78,10 @@ foreach(var unityPackageFile in allAssetFiles)
             if (type != "asset" && (!generateMeta || type != "asset.meta") && (!generatePreview || !type.StartsWith("preview")))
                 continue;
 
-            // getting key of asset - it it's top folder name
-            var key = entry.Name.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)[0];
+            var key = GetKey(entry.Name);
+            if (key == null)
+                continue;
+
             var destFilePath = Path.Combine(currentDestinationPath, resultFilePaths[key]);
             if (destFilePath == null)
             {
