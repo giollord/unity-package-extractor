@@ -28,6 +28,19 @@ string? GetKey(string entryName) =>
     entryName.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries)
         .FirstOrDefault(s => Regex.IsMatch(s, @"[0-9a-f]{32}", RegexOptions.IgnoreCase));
 
+TarEntry? GetNextEntry(TarReader tarReader)
+{
+    try
+    {
+        return tarReader.GetNextEntry();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error reading tar entry: {ex.Message}");
+        return null;
+    }
+}
+
 foreach (var unityPackageFile in allAssetFiles)
 {
     Console.WriteLine($"Processing {++packageCounter}/{allAssetFiles.Count} '{Path.GetFileName(unityPackageFile)}' at '{Path.GetDirectoryName(unityPackageFile)}'...");
@@ -41,7 +54,7 @@ foreach (var unityPackageFile in allAssetFiles)
     using (var tarReader = new TarReader(gzipStream))
     {
         TarEntry? entry;
-        while ((entry = tarReader.GetNextEntry()) != null)
+        while ((entry = GetNextEntry(tarReader)) != null)
         {
             if (entry.EntryType == TarEntryType.Directory || !entry.Name.EndsWith("pathname") || entry.DataStream == null)
                 continue;
@@ -68,7 +81,7 @@ foreach (var unityPackageFile in allAssetFiles)
     using (var tarReader = new TarReader(gzipStream))
     {
         TarEntry? entry;
-        while ((entry = tarReader.GetNextEntry()) != null)
+        while ((entry = GetNextEntry(tarReader)) != null)
         {
             if (entry.EntryType == TarEntryType.Directory)
                 continue;
@@ -82,14 +95,20 @@ foreach (var unityPackageFile in allAssetFiles)
             if (key == null)
                 continue;
 
-            var destFilePath = Path.Combine(currentDestinationPath, resultFilePaths[key]);
+            if(!resultFilePaths.TryGetValue(key, out var filePath))
+            {
+                Console.WriteLine($"Can't find file path for key '{key}' in asset '{unityPackageFile}'. Skipping.");
+                continue;
+            }
+
+            var destFilePath = Path.Combine(currentDestinationPath, filePath);
             if (destFilePath == null)
             {
-                Console.WriteLine($"Incorrect asset name, skipping: {resultFilePaths[key]}");
+                Console.WriteLine($"Incorrect asset name, skipping: {filePath}");
             }
 
             if (generatePreview && type.StartsWith("preview"))
-                destFilePath = Path.Combine(currentDestinationPath, "__Preview", resultFilePaths[key] + Path.GetExtension(type));
+                destFilePath = Path.Combine(currentDestinationPath, "__Preview", filePath + Path.GetExtension(type));
             else if (generateMeta && type == "asset.meta")
                 destFilePath += ".meta";
 
